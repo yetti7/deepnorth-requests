@@ -1,0 +1,18 @@
+.DS_Store
+
+# Ignore node_modules (dependencies should be installed via npm install)
+node_modules/
+
+# Ignore SQLite database files (should not be tracked in Git)
+requests.db
+
+# Ignore environment files (if you have any secrets)
+.env
+.env.local
+
+# Ignore log files
+*.log
+npm-debug.log*
+
+# Ignore Docker build files (if necessary)
+docker-compose.override.yml
