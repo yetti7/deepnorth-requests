@@ -10,7 +10,7 @@ const port = process.env.PORT || 3000;
 // ✅ Enable CORS to allow requests from deepnorth-js (localhost:3000)
 app.use(
   cors({
-    origin: 'http://localhost:3000', // Allow frontend
+    origin: ['http://localhost:3000', 'https://deepnorth.app', 'https://api.deepnorth.app'], // Allow localhost & Cloudflare domains
     methods: 'GET, POST, PUT, DELETE',
     allowedHeaders: 'Content-Type, Authorization',
   })
