@@ -5,12 +5,12 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 // ✅ Enable CORS to allow requests from deepnorth-js (localhost:3000)
 app.use(
   cors({
-    origin: 'http://localhost:3000', // Allow frontend
+    origin: ['http://localhost:3000', 'https://deepnorth.app', 'https://api.deepnorth.app'], // Allow localhost & Cloudflare domains
     methods: 'GET, POST, PUT, DELETE',
     allowedHeaders: 'Content-Type, Authorization',
   })
@@ -24,7 +24,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ✅ Initialize SQLite database
 const db = new Database('./requests.db');
 
-// ✅ API: Submit a new request
+// ✅ API: Submit a new request (Ensure 'status' is included)
 app.post('/api/requests', (req, res) => {
   const { name, media, title, author, mediaLink } = req.body;
 
@@ -34,10 +34,10 @@ app.post('/api/requests', (req, res) => {
 
   try {
     const stmt = db.prepare(
-      `INSERT INTO requests (name, media, title, author, mediaLink, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO requests (name, media, title, author, mediaLink, created_at, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
-    const info = stmt.run(name, media, title, author || null, mediaLink, new Date().toISOString());
+    const info = stmt.run(name, media, title, author || null, mediaLink, new Date().toISOString(), "Pending");
 
     res.json({
       id: info.lastInsertRowid,
@@ -47,13 +47,14 @@ app.post('/api/requests', (req, res) => {
       author,
       mediaLink,
       created_at: new Date(),
+      status: "Pending",
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to add request.' });
   }
 });
 
-// ✅ API: Get all open requests
+// ✅ API: Get all open requests (Include 'status')
 app.get('/api/requests', (req, res) => {
   try {
     const rows = db.prepare(`SELECT * FROM requests ORDER BY created_at DESC`).all();
@@ -63,7 +64,7 @@ app.get('/api/requests', (req, res) => {
   }
 });
 
-// ✅ API: Get all closed requests
+// ✅ API: Get all closed requests (Include 'status')
 app.get('/api/closed-requests', (req, res) => {
   try {
     const rows = db.prepare(`SELECT * FROM closed_requests ORDER BY closed_at DESC`).all();
@@ -73,7 +74,7 @@ app.get('/api/closed-requests', (req, res) => {
   }
 });
 
-// ✅ API: Move a request to closed_requests
+// ✅ API: Move a request to closed_requests (Ensure 'status' is updated)
 app.delete('/api/requests/:id', (req, res) => {
   const requestId = req.params.id;
 
@@ -82,10 +83,10 @@ app.delete('/api/requests/:id', (req, res) => {
     if (!row) return res.status(404).json({ error: 'Request not found.' });
 
     const insertStmt = db.prepare(
-      `INSERT INTO closed_requests (name, media, title, author, mediaLink, closed_at) 
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO closed_requests (id, name, media, title, author, mediaLink, closed_at, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     );
-    insertStmt.run(row.name, row.media, row.title, row.author, row.mediaLink, new Date().toISOString());
+    insertStmt.run(row.id, row.name, row.media, row.title, row.author, row.mediaLink, new Date().toISOString(), "Completed");
 
     db.prepare(`DELETE FROM requests WHERE id = ?`).run(requestId);
     res.json({ message: 'Request moved to closed successfully.' });
@@ -94,7 +95,7 @@ app.delete('/api/requests/:id', (req, res) => {
   }
 });
 
-// ✅ API: Reopen a closed request
+// ✅ API: Reopen a closed request (Ensure 'status' is reset to 'Pending')
 app.post('/api/reopen-request/:id', (req, res) => {
   const requestId = req.params.id;
 
@@ -103,10 +104,10 @@ app.post('/api/reopen-request/:id', (req, res) => {
     if (!row) return res.status(404).json({ error: 'Closed request not found.' });
 
     const insertStmt = db.prepare(
-      `INSERT INTO requests (name, media, title, author, mediaLink, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO requests (id, name, media, title, author, mediaLink, created_at, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     );
-    insertStmt.run(row.name, row.media, row.title, row.author, row.mediaLink, new Date().toISOString());
+    insertStmt.run(row.id, row.name, row.media, row.title, row.author, row.mediaLink, new Date().toISOString(), "Pending");
 
     db.prepare(`DELETE FROM closed_requests WHERE id = ?`).run(requestId);
     res.json({ message: 'Request reopened successfully.' });
