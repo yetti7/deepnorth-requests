@@ -1,26 +1,26 @@
-# Use an official Node.js runtime based on Alpine
-FROM node:18-alpine
+# ✅ Use Debian-based image (NOT Alpine) to avoid musl/glibc issues
+FROM node:18-slim
 
-# Set the working directory inside the container
+# Set working directory inside the container
 WORKDIR /app
 
-# Install system dependencies needed for `better-sqlite3`
-RUN apk add --no-cache python3 make g++ sqlite
+# ✅ Install system dependencies needed for `better-sqlite3`
+RUN apt-get update && apt-get install -y python3 make g++ sqlite3 && rm -rf /var/lib/apt/lists/*
 
-# Copy package.json and package-lock.json first (for efficient Docker caching)
+# ✅ Copy package.json and package-lock.json first (for efficient Docker caching)
 COPY package*.json ./
 
-# Remove any existing `node_modules` to prevent architecture mismatches
+# ✅ Remove any existing node_modules (fixes Windows/Linux conflicts)
 RUN rm -rf node_modules
 
-# Install dependencies inside the container (rebuilds `better-sqlite3` for Alpine)
-RUN npm install --omit=dev
+# ✅ Install dependencies inside the container (rebuilds `better-sqlite3` properly)
+RUN npm install --omit=dev --force
 
-# Copy the rest of the application files
+# ✅ Copy the rest of the application files
 COPY . .
 
-# Expose the correct port
+# ✅ Expose the correct port
 EXPOSE 3000
 
-# Command to run the application
+# ✅ Start the app
 CMD ["node", "app.js"]
