@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 // ✅ Enable CORS to allow requests from deepnorth-js (localhost:3000)
 app.use(
@@ -106,8 +106,8 @@ app.post('/api/reopen-request/:id', (req, res) => {
     console.log(`🔥 Moving request ID ${requestId} to open with status: ${newStatus}`);
 
     const insertStmt = db.prepare(
-      `INSERT INTO requests (name, media, title, author, mediaLink, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO requests (id, name, media, title, author, mediaLink, created_at, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     );
     insertStmt.run(row.id, row.name, row.media, row.title, row.author, row.mediaLink, new Date().toISOString(), newStatus);
 
