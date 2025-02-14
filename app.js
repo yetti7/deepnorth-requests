@@ -56,7 +56,7 @@ app.post('/api/requests', (req, res) => {
 // ✅ API: Get all open requests
 app.get('/api/requests', (req, res) => {
   try {
-    const rows = db.prepare(`SELECT * FROM requests ORDER BY created_at DESC`).all();
+    const rows = db.prepare(`SELECT id, name, media, title, author, mediaLink, created_at, status FROM requests ORDER BY created_at DESC`).all();
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve requests.' });
@@ -66,7 +66,7 @@ app.get('/api/requests', (req, res) => {
 // ✅ API: Get all closed requests
 app.get('/api/closed-requests', (req, res) => {
   try {
-    const rows = db.prepare(`SELECT * FROM closed_requests ORDER BY closed_at DESC`).all();
+    const rows = db.prepare(`SELECT id, name, media, title, author, mediaLink, closed_at, status FROM closed_requests ORDER BY closed_at DESC`).all();
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve closed requests.' });
@@ -97,33 +97,89 @@ app.delete('/api/requests/:id', (req, res) => {
 // ✅ API: Reopen a closed request
 app.post('/api/reopen-request/:id', (req, res) => {
   const requestId = req.params.id;
+  const newStatus = req.body.status || "Pending"; // ✅ Preserve UI-selected status
 
   try {
     const row = db.prepare(`SELECT * FROM closed_requests WHERE id = ?`).get(requestId);
     if (!row) return res.status(404).json({ error: 'Closed request not found.' });
 
+    console.log(`🔥 Moving request ID ${requestId} to open with status: ${newStatus}`);
+
     const insertStmt = db.prepare(
       `INSERT INTO requests (name, media, title, author, mediaLink, created_at) 
        VALUES (?, ?, ?, ?, ?, ?)`
     );
-    insertStmt.run(row.name, row.media, row.title, row.author, row.mediaLink, new Date().toISOString());
+    insertStmt.run(row.id, row.name, row.media, row.title, row.author, row.mediaLink, new Date().toISOString(), newStatus);
 
     db.prepare(`DELETE FROM closed_requests WHERE id = ?`).run(requestId);
-    res.json({ message: 'Request reopened successfully.' });
+
+    console.log(`✅ Request moved to open with status: ${newStatus}`);
+    res.json({ message: `Request reopened with status: ${newStatus}` });
   } catch (err) {
+    console.error(`❌ Error reopening request:`, err);
     res.status(500).json({ error: 'Failed to reopen request.' });
   }
 });
 
-// ✅ API: Delete a closed request
-app.delete('/api/closed-requests/:id', (req, res) => {
-  const requestId = req.params.id;
+// ✅ API: Move a request to closed_requests with the correct status
+app.post('/api/move-to-closed', (req, res) => {
+  const { id, status } = req.body;
+
+  if (!id || !status) {
+    return res.status(400).json({ error: "Missing request ID or status." });
+  }
 
   try {
-    db.prepare(`DELETE FROM closed_requests WHERE id = ?`).run(requestId);
-    res.json({ message: 'Closed request deleted successfully.' });
+    const row = db.prepare(`SELECT * FROM requests WHERE id = ?`).get(id);
+    if (!row) return res.status(404).json({ error: "Request not found." });
+
+    console.log(`🔥 Moving request ID ${id} to closed_requests with status: ${status}`); // Debug log
+
+    const insertStmt = db.prepare(
+      `INSERT INTO closed_requests (id, name, media, title, author, mediaLink, closed_at, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    insertStmt.run(row.id, row.name, row.media, row.title, row.author, row.mediaLink, new Date().toISOString(), status);
+
+    db.prepare(`DELETE FROM requests WHERE id = ?`).run(id);
+    
+    console.log(`✅ Request moved to closed with status: ${status}`);
+    res.json({ message: `Request moved to closed with status: ${status}.` });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to delete closed request.' });
+    console.error(`❌ Error moving request to closed:`, err);
+    res.status(500).json({ error: "Failed to move request to closed." });
+  }
+});
+
+// ✅ API: Update request status (Without moving or deleting)
+app.post('/api/update-status', (req, res) => {
+  const { id, status } = req.body;
+
+  if (!id || !status) return res.status(400).json({ error: "Missing request ID or status." });
+
+  try {
+    db.prepare(`UPDATE requests SET status = ? WHERE id = ?`).run(status, id);
+    res.json({ message: "Request status updated successfully." });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update request status." });
+  }
+});
+
+// ✅ API: Update status in the closed_requests table (No restrictions on status changes)
+app.post('/api/update-closed-status', (req, res) => {
+  const { id, status } = req.body;
+
+  if (!id || !status) {
+    return res.status(400).json({ error: "Missing request ID or status." });
+  }
+
+  try {
+    const stmt = db.prepare(`UPDATE closed_requests SET status = ? WHERE id = ?`);
+    stmt.run(status, id);
+
+    res.json({ message: "Closed request status updated successfully." });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update closed request status." });
   }
 });
 
