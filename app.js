@@ -183,6 +183,22 @@ app.post('/api/update-closed-status', (req, res) => {
   }
 });
 
+// ✅ API: Delete a closed request
+app.delete('/api/closed-requests/:id', (req, res) => {
+  const requestId = req.params.id;
+
+  try {
+    const row = db.prepare(`SELECT * FROM closed_requests WHERE id = ?`).get(requestId);
+    if (!row) return res.status(404).json({ error: "Request not found." });
+
+    db.prepare(`DELETE FROM closed_requests WHERE id = ?`).run(requestId);
+    res.json({ message: "Closed request deleted successfully." });
+  } catch (err) {
+    console.error("❌ Error deleting closed request:", err);
+    res.status(500).json({ error: "Failed to delete closed request." });
+  }
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
